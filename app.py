@@ -7,14 +7,14 @@ import cryptocode
 from jose import JWTError, jwt
 
 app = Flask(__name__)
-CORS(app)
+# CORS(app)
 # cors = CORS(app, resources={r"/api": {"origins": "http://localhost:4200"}})
 # cors = CORS(app, resources={r"/api/*": {"origins": "*"}})
-# cors = CORS(app, resource={
-#     r"/*":{
-#         "origins":"*"
-#     }
-# })
+cors = CORS(app, resource={
+    r"/*":{
+        "origins":"*"
+    }
+})
 # app = CORS(app, resources={r"/api/*": {"origins": ["http://localhost:4200", "http://www.domain2.com"]}})
 
 # cors = CORS(app, origins=['http://localhost:4200', 'http://192.168.1.163:4200'])
@@ -45,6 +45,7 @@ class Guest(Base):
     id = Column(Integer(), primary_key = True)
     guest_uuid = Column(String(36), server_default="")
     name = Column(String(150), server_default="")
+    contact_number = Column(String(20), server_default="")
     status = Column(String(10), server_default="pending")
     link = Column(String(500), server_default="")
     created_at = Column(TIMESTAMP())
@@ -142,7 +143,8 @@ def update_guest_status():
         db.query(Guest).filter(
             Guest.id == data["id"],
         ).update({
-            "status": data["status"]
+            "status": data["status"],
+            "contact_number": data["contact_number"] if "contact_number" in data else ""
         })
         db.commit()
 
@@ -157,6 +159,7 @@ def upsert_guests():
     data = request.json
 
     # print(data)
+    # return ('', 204)
 
     if "toUpdate" in data and "toAdd" in data and "toDelete" in data:
         db = next(get_db())
@@ -173,7 +176,8 @@ def upsert_guests():
         for guest in data["toUpdate"]:
             db.query(Guest).filter(Guest.id == guest["id"]).update({
                 "status": guest["status"],
-                "name": guest["name"]
+                "name": guest["name"],
+                "contact_number": guest["contact_number"]
             })
 
         db.commit()
@@ -185,6 +189,39 @@ def upsert_guests():
 
 @app.route("/login", methods=["POST"])
 def login():
+    data = request.json
+    temporary_accounts = [
+        {
+            "email": "don@email.com",
+            "password": "P@ssw0rd123!"
+        }
+    ]
+
+    if data and data['email'] and data['password']:
+        user = [d for d in temporary_accounts if d['email'] == data["email"]]
+
+        if user:
+            if data["password"] == user[0]["password"]:
+                to_encode = {
+                    "email": data["email"],
+                    "exp": datetime.utcnow() + timedelta(minutes = 0)
+                }
+
+                encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm="HS256")
+                return make_response(jsonify({
+                    "token": encoded_jwt
+                }), 200)
+            
+        return make_response(jsonify({
+                    "msg": 'Invalid username or password'
+                }), 401)
+    
+    return make_response(jsonify({
+                    "msg": 'Malformed Data!'
+                }), 400)
+
+
+def login_backup():
     data = request.json
 
     # USED FOR CREATING PASSWORD
